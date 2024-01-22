@@ -79,6 +79,55 @@ async def get_warehouse_tariffs(
                 warehouse.get("palletStorageValueExpr")
             ),
             "warehouse_id": int(warehouse_id),
+            "box_delivery_and_storage_color_expr": warehouse.get(
+                "boxDeliveryAndStorageColorExpr"
+            ),
+            "box_delivery_and_storage_color_expr_next": warehouse.get(
+                "boxDeliveryAndStorageColorExprNext"
+            ),
+            "box_delivery_and_storage_diff_sign": warehouse.get(
+                "boxDeliveryAndStorageDiffSign"
+            ),
+            "box_delivery_and_storage_diff_sign_next": warehouse.get(
+                "boxDeliveryAndStorageDiffSignNext"
+            ),
+            "box_delivery_and_storage_expr_next": str_to_float(
+                warehouse.get("boxDeliveryAndStorageExprNext")
+            ),
+            "box_delivery_and_storage_visible_expr": str_to_float(
+                warehouse.get("boxDeliveryAndStorageVisibleExpr")
+            ),
+            "pallet_delivery_color_expr": warehouse.get(
+                "palletDeliveryColorExpr"
+            ),
+            "pallet_delivery_color_expr_next": warehouse.get(
+                "palletDeliveryColorExprNext"
+            ),
+            "pallet_delivery_diff_sign": warehouse.get(
+                "palletDeliveryDiffSign"
+            ),
+            "pallet_delivery_diff_sign_next": warehouse.get(
+                "palletDeliveryDiffSignNext"
+            ),
+            "pallet_delivery_expr_next": str_to_float(
+                warehouse.get("palletDeliveryExprNext")
+            ),
+            "pallet_storage_color_expr": warehouse.get(
+                "palletStorageColorExpr"
+            ),
+            "pallet_storage_color_expr_next": warehouse.get(
+                "palletStorageColorExprNext"
+            ),
+            "pallet_storage_diff_sign": warehouse.get("palletStorageDiffSign"),
+            "pallet_storage_diff_sign_next": warehouse.get(
+                "palletStorageDiffSignNext"
+            ),
+            "pallet_storage_expr_next": str_to_float(
+                warehouse.get("palletStorageExprNext")
+            ),
+            "pallet_visible_expr": str_to_float(
+                warehouse.get("palletVisibleExpr")
+            ),
         }
         warehouse_tariffs.append(warehouse_data)
     return warehouse_tariffs
