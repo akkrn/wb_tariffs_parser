@@ -26,7 +26,7 @@ async def main():
     logger.info("Database connected")
 
     uid = "e8a4dd18-5cb0-563e-a7e8-1c6a459606c7"
-    query = "SELECT id,token FROM wb_sellers WHERE uid = $1"
+    query = "SELECT id,token FROM wb_sellers_tariffs WHERE uid = $1"
     row = await db_client.pool.fetchrow(query, uid)
     token = row["token"]
     start_date = datetime.date(2023, 11, 30)
