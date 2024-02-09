@@ -176,8 +176,35 @@ class DBClient:
         values = [tuple(item[key] for key in keys) for item in data]
         await self.pool.executemany(query, values)
 
-    async def clear_database(self):  # Тестовый метод для очистки базы данных
-        tables = ["wb_sellers"]
-        for table in tables:
-            query = f"DELETE FROM {table}"
-            await self.pool.execute(query)
+    async def insert_update_data(
+        self,
+        table_name,
+        data,
+        conflict_target=None,
+        update_fields=None,
+    ):
+        if isinstance(data, dict):
+            data = [data]
+        if data:
+            keys = data[0].keys()
+            columns = ", ".join(keys)
+            values_placeholders = ", ".join(
+                f"${i + 1}" for i in range(len(keys))
+            )
+            values = [tuple(item[key] for key in keys) for item in data]
+            if conflict_target and update_fields:
+                update_expressions = ", ".join(
+                    f"{field} = EXCLUDED.{field}" for field in update_fields
+                )
+                query = (
+                    f"INSERT INTO {table_name} ({columns}) VALUES "
+                    f"({values_placeholders}) ON CONFLICT ON CONSTRAINT {conflict_target} "
+                    f"DO UPDATE SET {update_expressions};"
+                )
+            else:
+                query = (
+                    f"INSERT INTO {table_name} ({columns}) VALUES ("
+                    f"{values_placeholders}) ON CONFLICT DO NOTHING;"
+                )
+            print("DEBUG QUERY:", query)
+            await self.pool.executemany(query, values)
