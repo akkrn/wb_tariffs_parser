@@ -66,7 +66,9 @@ async def main():
             );
             """
     await db_client.pool.execute(query)
-    await extract_input_fulfillments_rates(db_client, "data/fulfillments.xlsx")
+    await extract_input_fulfillments_rates(
+        db_client, "data/fulfillments.xlsx"
+    )
     await db_client.close_pool()
 
 

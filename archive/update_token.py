@@ -67,7 +67,7 @@ class WildberriesToken:
 
 
 async def update_token_for_uid(db_client: DBClient, uid: str) -> None:
-    query = "SELECT token FROM wb_sellers WHERE uid=$1"
+    query = "SELECT token FROM wb_sellers_tariffs WHERE uid=$1"
     row = await db_client.pool.fetchrow(query, uid)
     token = row["token"]
     try:
@@ -76,7 +76,7 @@ async def update_token_for_uid(db_client: DBClient, uid: str) -> None:
             new_token = await service.get_token_and_login()
             if new_token:
                 update_query = (
-                    "UPDATE wb_sellers SET token = $1 WHERE uid = $2"
+                    "UPDATE wb_sellers_tariffs SET token = $1 WHERE uid = $2"
                 )
                 await db_client.pool.execute(update_query, new_token, uid)
                 logger.info(f"Token updated for uid {uid}")
