@@ -4,8 +4,8 @@ venv/
 .idea/
 *.idea
 
-main_test.py
+archive/main_test.py
 .env
 
 __pycache__/
-data/
+archive/data/
