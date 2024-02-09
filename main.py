@@ -1,127 +1,94 @@
 import asyncio
 import datetime
 import logging
+import sentry_sdk
+from asyncpg import Record
 
-from data_extractor import (
-    get_weekly_rating,
-    get_logistics_rates,
-    get_warehouse_tariffs,
-    get_return_tariffs,
-    get_acceptance_coefficients,
-)
+from data_extractor import WbDataExtractor
+
 from db_client import DBClient
-from wb_delivery_parsing import WildberriesDelivery
+from exceptions import FailedGetDataException, AuthException
+from wb_parser import WbParser
 
 logger = logging.getLogger(__name__)
 
 
-UIDS = [
-    "e8a4dd18-5cb0-563e-a7e8-1c6a459606c7",
-    "dd027d1f-7065-43ae-a4b7-7484ef4095f6",
-]
+async def execute_tasks(db_client: DBClient, seller: Record, task_creator):
+    """
+    Общая функция для инициализации и выполнения задач.
+    """
+    refresh_token = seller.get("refresh_token")
+    device_id = seller.get("device_id")
+    supplier_id = seller.get("supplier_id")
+    name = seller.get("name")
+
+    if not (refresh_token and device_id):
+        logging.error(f"Токен для селлера: {name} не найден.")
+        return
+
+    wb_parser = WbParser(refresh_token, supplier_id, device_id)
+    wb_data_extractor = WbDataExtractor(db_client, wb_parser)
+    try:
+        tasks = await task_creator(wb_data_extractor)
+        return await asyncio.gather(*tasks)
+    except AuthException:
+        logging.warning(f"Некорректная авторизация поставщика: {name}")
+    except FailedGetDataException as e:
+        logging.warning(e)
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+    finally:
+        await wb_parser.close()
 
 
-async def get_token(db_client: DBClient, uid: str) -> list[dict]:
-    """
-    Получение токенов
-    """
-    # TODO add caching for user data
-    query = "SELECT id, token, uid FROM wb_sellers WHERE uid = $1"
-    row = await db_client.pool.fetchrow(query, uid)
-    return row
 
-
-async def process_many_clients(db_client: DBClient, uid: str) -> list:
-    """
-    Запуск и выполнение асинхронных задач, результат которых будет
-    отличаться для каждого клиента
-    """
-    row = await get_token(db_client, uid)
-    token = row.get("token")
-    if token:
-        wb_delivery = WildberriesDelivery(token, uid)
-        tasks = [
-            get_weekly_rating(row.get("id"), wb_delivery),
+async def get_individual_data(db_client: DBClient, seller: Record) -> None:
+    async def task_creator(wb_data_extractor):
+        return [
+            wb_data_extractor.insert_weekly_rating(seller.get("id")),
         ]
-        result = await asyncio.gather(*tasks)
-        await wb_delivery.close()
-        return result
+    await execute_tasks(db_client, seller, task_creator)
 
 
-async def process_one_client(db_client: DBClient, uid: str) -> list:
-    """
-    Запуск и выполнение асинхронных задач, результат которых не зависит от uid
-    """
-    row = await get_token(db_client, uid)
-    token = row.get("token")
-    if token:
-        wb_delivery = WildberriesDelivery(token, uid)
-        tasks = [
-            get_warehouse_tariffs(
-                wb_delivery,
-                db_client,
-                datetime.date.today() + datetime.timedelta(days=3),
-            ),
-            # get_logistics_rates(wb_delivery, db_client),
-            get_acceptance_coefficients(
-                wb_delivery,
-                db_client,
-                datetime.date.today() + datetime.timedelta(days=3),
-            ),
-            get_return_tariffs(
-                wb_delivery, datetime.date.today() + datetime.timedelta(days=3)
-            ),
+async def get_common_data(db_client: DBClient, seller: Record) -> None:
+    async def task_creator(wb_data_extractor):
+        today = datetime.date.today()
+        return [
+            *[wb_data_extractor.insert_warehouse_tariffs(today + datetime.timedelta(days=delta_days)) for delta_days in
+              range(3)],
+            wb_data_extractor.insert_commission_rates(),
+            wb_data_extractor.insert_acceptance_coefficients(today),
+            wb_data_extractor.insert_return_tariffs(today),
         ]
-        result = await asyncio.gather(*tasks)
-        await wb_delivery.close()
-        return result
-    else:
-        logging.error(f"Токен для uid {uid} не найден.")
+    await execute_tasks(db_client, seller, task_creator)
 
 
 async def main():
     logging.basicConfig(
         level=logging.INFO,
         format="%(filename)s:%(lineno)d #%(levelname)-8s "
-        "[%(asctime)s] - %(name)s - %(message)s",
+               "[%(asctime)s] - %(name)s - %(message)s",
     )
     logger.info("Start of the program")
 
     db_client = DBClient()
     await db_client.create_pool()
-    await db_client.create_tables()
     logger.info("Database connected")
 
-    tasks = [process_many_clients(db_client, uid) for uid in UIDS]
-    result = await asyncio.gather(*tasks)
-    tables = ["wb_seller_logistics_coefficients"]
-    for row in result:
-        for i in range(len(row)):
-            if row[i]:
-                await db_client.insert_data(tables[i], row[i])
-                logger.debug(f"Data inserted into {tables[i]}")
+    query = "SELECT * FROM wb_sellers_tariffs"
+    sellers = await db_client.pool.fetch(query)
 
-    # Запуск асинхронных задач, не зависящих от UID
-    tasks = process_one_client(db_client, UIDS[0])
-    result = await asyncio.gather(tasks)
-    tables = [
-        "wb_warehouses_tariffs",
-        # "wb_logistics_rates",
-        "wb_acceptance_coefficients",
-        "wb_return_tariffs",
-    ]
-    for row in result:
-        print(row)
-        for i in range(len(row)):
-            if row[i]:
-                await db_client.insert_data(tables[i], row[i])
-                logger.debug(f"Data inserted into {tables[i]}")
+    tasks = [get_individual_data(db_client, seller) for seller in sellers]
+    await asyncio.gather(*tasks, get_common_data(db_client, sellers[0]))
+
 
     await db_client.close_pool()
     logger.info("Database disconnected")
 
 
 if __name__ == "__main__":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    sentry_sdk.init(
+        "https://8f38ea66aa11448e8db646f2e8258781@gt.botkompot.ru/7"
+    )
     asyncio.run(main())
     logger.info("End of the program")
