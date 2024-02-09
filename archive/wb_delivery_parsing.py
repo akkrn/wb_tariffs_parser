@@ -82,12 +82,12 @@ class WildberriesDelivery:
                 "-portal-analytics/api/v1/weekly-rating"
             )
 
-            base_url = url.split("https://")[1].split(".wildberries.ru")[0]
-            subdomain_token = await self.__get_token_and_login(base_url)
+            # base_url = url.split("https://")[1].split(".wildberries.ru")[0]
+            # subdomain_token = await self.__get_token_and_login(base_url)
 
             cookies = {
-                "WBToken": subdomain_token,
-                "x-supplier-id": self._supplier_id,
+                "wbx-refresh": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MDc0NTM2NjAsInZlcnNpb24iOjMsInVzZXIiOiIxMzMyNTE5MjMiLCJzaGFyZF9rZXkiOiI3IiwiY2xpZW50X2lkIjoic2VsbGVyLXBvcnRhbCIsInNlc3Npb25faWQiOiI4ZmFiYWYzYTZjNjA0ZDBmYTIxMzg3NjUyNTVkY2VhZiIsInVzZXJfcmVnaXN0cmF0aW9uX2R0IjoxNzAwMTQyNTMxLCJwaG9uZSI6Imd3SEFONS9sSEduOEM0eG1weVJWVWc9PSJ9.Bfxc_kevMER0DO6DgVMcTr3EIAcMXbWtKZb8jREdk2Ls0qPraOJpK-YIha5ozRzm7dZFJplDIGw5A0_BOszD4BaB11_ddKzmKzBbtnnJhnVV9DYGvbXEb_mUkovjsOD5iZ1oaHKnAyJ0IupTlawGvHqH-J5nPwZUtgk5dVPx1g5ctiif4Lw95geugZ7yb7ZYdAYHbJwww4RYWumIN4Jn5JMZpnqWu8S4KBJXtyv6yncrrmOs6FeIvrj7HjD0SrbBwsgXB8JUNTbqiPNQsOrZW7O969oislcJ8qm0Tm5nYxvRB428HK8FKGE3NHaX1tuu6yZIYFNVfVcy98Q09ahv2g",
+                "wbx-seller-device-id": "supplier-portal__-110b3dbb-7eaa-46ae-b519-ce62fb7c3861",
             }
             response = await self.client.request(
                 "GET", url, headers=headers, cookies=cookies
@@ -136,7 +136,7 @@ class WildberriesDelivery:
         except Exception as e:
             logger.error(e)
 
-    async def logistics_rates(self) -> dict:
+    async def get_commission_rates(self) -> dict:
         """
         Парсинг коммисий по категориям
         """
@@ -238,6 +238,39 @@ class WildberriesDelivery:
             cookies = {
                 "WBToken": subdomain_token,
                 "x-supplier-id-external": self._supplier_id,
+            }
+            response = await self.client.request(
+                "GET", url, headers=headers, cookies=cookies
+            )
+            if response.status != HTTPStatus.OK:
+                raise Exception(
+                    f"Failed to get data, status: {response.status}"
+                )
+            return await response.json()
+        except Exception as e:
+            logger.error(e)
+
+    async def get_categories_data(self) -> dict:
+        """
+        Парсинг всех категорий и подкатегорий
+        """
+        try:
+            headers = {
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+                "Connection": "keep-alive",
+                "Content-type": "application/json",
+                "Origin": "https://seller.wildberries.ru",
+                "Referer": "https://seller.wildberries.ru/dynamic-product-categories/commission",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            }
+            url = "https://seller.wildberries.ru/ns/categories-info/suppliers-portal-analytics/api/v1/subjects"
+            base_url = url.split("https://")[1].split(".wildberries.ru")[0]
+            subdomain_token = await self.__get_token_and_login(base_url)
+            cookies = {
+                "external-locale": "ru",
+                "WBToken": subdomain_token,
+                "x-supplier-id": self._supplier_id,
             }
             response = await self.client.request(
                 "GET", url, headers=headers, cookies=cookies
