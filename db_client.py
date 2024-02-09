@@ -1,4 +1,3 @@
-
 import asyncpg
 import os
 
@@ -31,7 +30,7 @@ class DBClient:
     async def create_tables(self):
         queries = [
             """
-            CREATE TABLE IF NOT EXISTS wb_sellers (
+            CREATE TABLE IF NOT EXISTS wb_sellers_tariffs (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(50),
                 uid VARCHAR(50) UNIQUE,
@@ -60,7 +59,7 @@ class DBClient:
                 localization_index FLOAT,
                 date DATE,
                 UNIQUE (seller_id, date),
-                FOREIGN KEY (seller_id) REFERENCES wb_sellers (id)
+                FOREIGN KEY (seller_id) REFERENCES wb_sellers_tariffs (id)
             );
             """,
             """
@@ -145,6 +144,18 @@ class DBClient:
                 delivery_dump_srg_office_expr VARCHAR(255),
                 delivery_dump_srg_return_expr VARCHAR(255),
                 UNIQUE (warehouse_name, date)
+                );
+            """,
+            """
+                CREATE TABLE IF NOT EXISTS wb_commission_rates (
+                    id SERIAL PRIMARY KEY,
+                    category_name VARCHAR,
+                    item_name VARCHAR,
+                    date DATE,
+                    fbo_rate FLOAT,
+                    fbs_rate FLOAT,
+                    china_rate FLOAT,
+                    UNIQUE (category_name, item_name, date)
                 );
             """,
         ]
